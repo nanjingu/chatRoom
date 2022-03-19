@@ -96,6 +96,7 @@ private:
     bool add_content_length(int content_length);
     bool add_content_type();
     bool add_linger();
+    bool add_cookie();
     bool add_blank_line();
 
 public:
@@ -106,6 +107,8 @@ public:
 private:
     
     int m_sockfd;
+    string cookie;
+    bool verifyOk;
     sockaddr_in m_address;
     char m_read_buf[READ_BUFFER_SIZE];
     int m_read_idx;
