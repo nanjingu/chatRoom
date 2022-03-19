@@ -91,6 +91,8 @@ void http_conn::init(int sockfd, const sockaddr_in& addr)
 
 void http_conn::init()
 {
+    verifyOk = false;
+    cookie = "";
     bytes_to_send = 0;
     bytes_have_send = 0;
     m_check_state = CHECK_STATE_REQUESTLINE;
@@ -159,7 +161,7 @@ bool http_conn::read()
             return false;
         m_read_idx += byte_read;
     }
-    //printf("\n%s\n", m_read_buf);
+    printf("\n%s", m_read_buf);
     return true;
 }
 
@@ -167,8 +169,8 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char* text)
 {
     //printf("%s\n", text);
     m_url = strpbrk(text, " \t");
-    printf("m_url:%s\n", m_url);
-    printf("text:%s\n", text);
+    //printf("m_url:%s\n", m_url);
+    //printf("text:%s\n", text);
     if(!m_url)
         return BAD_REQUEST;
     *m_url++ = '\0';
@@ -220,7 +222,7 @@ http_conn::HTTP_CODE http_conn::parse_headers(char* text)
             return NO_REQUEST;
         }
         return GET_REQUEST;
-    }
+    } 
     else if(strncasecmp(text, "Connection:", 11) == 0)
     {
         text += 11;
@@ -233,6 +235,13 @@ http_conn::HTTP_CODE http_conn::parse_headers(char* text)
         text += 15;
         text += strspn(text, " \t");
         m_content_length = atol(text);
+    }
+    else if(strncasecmp(text, "Cookie:", 7) == 0)
+    {
+        text += 7;
+        text += strspn(text, " \t");
+        verifyOk = true;
+        cookie = text;
     }
     else if(strncasecmp(text, "Host:", 5) == 0)
     {
@@ -310,7 +319,7 @@ http_conn:: HTTP_CODE http_conn::do_request()
     strcpy(m_real_file, doc_root);
     int len = strlen(doc_root);
     const char* p = strrchr(m_url, '/');
-    printf("second m_url:%s\n", m_url);
+    //printf("second m_url:%s\n", m_url);
     if(cgi == 1 && (*(p + 1) == '3' || *(p + 1) == '4'))//log or register
     {
         char flag = m_url[1];
@@ -340,7 +349,7 @@ http_conn:: HTTP_CODE http_conn::do_request()
             strcat(sql_insert, "')");
             if(users.find(name) == users.end())
             {
-                m_name = name;cout<<m_name<<" " << name<<endl;
+                m_name = name;//cout<<m_name<<" " << name<<endl;
                 m_lock.lock();
                 int res = mysql_query(mysql, sql_insert);
                 users.insert(pair<string, string>(name, password));
@@ -355,8 +364,9 @@ http_conn:: HTTP_CODE http_conn::do_request()
         {
             if(users.find(name) != users.end() && users[name] == password)
             {
-                m_name = name;cout<<m_name<<" " << name<<endl;
+                m_name = name;
                 strcpy(m_url, "/welcome.html");
+                verifyOk = true;cout<<verifyOk<<" hhhhhhhh" <<endl;
             }
             else
                 strcpy(m_url, "/logError.html");
@@ -378,7 +388,7 @@ http_conn:: HTTP_CODE http_conn::do_request()
             cout << "file1 open error! " << endl;
         }
         else{
-            cout<<"cout file : "<<m_name<<endl;
+            //cout<<"cout file : "<<m_name<<endl;
             file1 << m_name<<" : " <<cur<<" : "<<endl;
                 file1 << "  " << say<<endl;
             file1.close();
@@ -389,28 +399,32 @@ http_conn:: HTTP_CODE http_conn::do_request()
     if(*(p + 1) == 'm' || *(p + 1) == '7')
     {
         char* m_url_real = (char*)malloc(sizeof(char)*200);
-        strcpy(m_url_real, "/user_txt.html");
+        if(!verifyOk)strcpy(m_url_real, "/log.html");
+        else strcpy(m_url_real, "/user_txt.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
         free(m_url_real);
-    }
+    } 
     else if(*(p + 1) == 't')
     {
         char* m_url_real = (char*)malloc(sizeof(char)*200);
-        strcpy(m_url_real, "/word.html");
+        if(!verifyOk)strcpy(m_url_real, "/log.html");
+        else strcpy(m_url_real, "/word.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-        free(m_url_real);
+        free(m_url_real);cout<<verifyOk<<" hhhhhhhh" <<endl;
     }
     else if(*(p + 1) == 'p')
     {
         char* m_url_real = (char*)malloc(sizeof(char)*200);
-        strcpy(m_url_real, "/picture.html");
+        if(!verifyOk)strcpy(m_url_real, "/log.html");
+        else strcpy(m_url_real, "/picture.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
         free(m_url_real);
     } 
     else if(*(p + 1) == 'v')
     {
         char* m_url_real = (char*)malloc(sizeof(char)*200);
-        strcpy(m_url_real, "/video.html");
+        if(!verifyOk)strcpy(m_url_real, "/log.html");
+        else strcpy(m_url_real, "/video.html");
         strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
         free(m_url_real);
     }
@@ -447,7 +461,7 @@ http_conn:: HTTP_CODE http_conn::do_request()
     {
         return BAD_REQUEST;
     }
-    cout<<"m_real_file = " << m_real_file << endl;
+    //cout<<"m_real_file = " << m_real_file << endl;
     int fd = open(m_real_file, O_RDONLY);
     m_file_address = (char*)mmap(0, m_file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
@@ -474,7 +488,7 @@ bool http_conn::write()
     }
     while(1)
     {
-        temp = writev(m_sockfd, m_iv, m_iv_count);cout<<i++<<" now write file length is : "<< temp<<endl;
+        temp = writev(m_sockfd, m_iv, m_iv_count);//cout<<i++<<" now write file length is : "<< temp<<endl;
         if(temp < 0)
         {
             if(errno == EAGAIN)
@@ -537,9 +551,14 @@ bool http_conn::add_headers(int content_len)
 {
     add_content_length(content_len);
     add_linger();
+    if(verifyOk) add_cookie();
     add_blank_line();
 }
 
+bool http_conn:: add_cookie()
+{
+    return add_response("Set-Cookie:cookie=ok\r\n");
+}
 bool http_conn:: add_content_length(int content_len)
 {
     return add_response("Content-length:%d\r\n", content_len);
@@ -597,7 +616,7 @@ bool http_conn::process_write(HTTP_CODE ret)
             m_iv[0].iov_base = m_write_buf;//cout<<m_write_buf<<endl;
             m_iv[0].iov_len = m_write_idx;
             m_iv[1].iov_base = m_file_address;//cout<<m_file_address<<endl;
-            m_iv[1].iov_len = m_file_stat.st_size;cout<<"file length : " << m_file_stat.st_size<<endl;
+            m_iv[1].iov_len = m_file_stat.st_size;//cout<<"file length : " << m_file_stat.st_size<<endl;
             m_iv_count = 2;
             bytes_to_send = m_write_idx + m_file_stat.st_size;
             return true;
