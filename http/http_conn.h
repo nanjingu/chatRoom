@@ -23,6 +23,8 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <time.h>
+#include <sys/time.h>
 #include "../lock/locker.h"
 #include "../CGImysql/sql_connection_pool.h"
 
