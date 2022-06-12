@@ -10,7 +10,7 @@
  const char* error_404_form = "The requested file was not found on this server.\n";
  const char* error_500_title = "Internal Error";
  const char* error_500_form = "There was an unusual problem serving the requested file.\n";
- const char* doc_root = "/home/user/programe/myWebServer/html";
+ const char* doc_root = "/home/user/programe/chatRoom/html";
 
  locker m_lock;
  map<string, string> users;
@@ -314,6 +314,22 @@ http_conn::HTTP_CODE http_conn::process_read()
     return NO_REQUEST;
 }
 
+static int timestamp(char *data, size_t len)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    time_t seconds = tv.tv_sec;
+
+    struct tm tm_time;
+
+    gmtime_r(&seconds, &tm_time);
+
+    return snprintf(data, len, "%4d%02d%02d %02d:%02d:%02d",
+                    tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday,
+                    tm_time.tm_hour, tm_time.tm_min, tm_time.tm_sec);
+}
+
 http_conn:: HTTP_CODE http_conn::do_request()
 {
     strcpy(m_real_file, doc_root);
@@ -376,7 +392,9 @@ http_conn:: HTTP_CODE http_conn::do_request()
     if(cgi == 1 && (*(p + 1) == '6'))//
     {
         strcpy(m_url, "/user_txt.html");
-        time_t cur = time(NULL);
+        //time_t cur = time(NULL);
+        char        data[18];
+        timestamp(data, 18);
         char say[100];
         int i;
         for(i = 4; m_string[i] != '\0'; ++i)
@@ -389,7 +407,7 @@ http_conn:: HTTP_CODE http_conn::do_request()
         }
         else{
             //cout<<"cout file : "<<m_name<<endl;
-            file1 << m_name<<" : " <<cur<<" : "<<endl;
+            file1 << m_name<<" : " <<data<<" : "<<endl;
                 file1 << "  " << say<<endl;
             file1.close();
         }
